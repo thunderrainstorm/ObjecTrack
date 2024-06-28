@@ -1,4 +1,3 @@
-// Import dependencies
 import React, { useRef, useState, useEffect } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as cocossd from "@tensorflow-models/coco-ssd";
@@ -12,18 +11,15 @@ function App() {
   const [detectedObjects, setDetectedObjects] = useState([]);
   const objectColorsRef = useRef({});
 
-    // Function to generate random color
-    const getRandomColor = () => {
-      const letters = '0123456789ABCDEF';
-      let color = '#';
-      for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-      }
-      return color;
-    };
+  const getRandomColor = () => {
+    const letters = "0123456789ABCDEF";
+    let color = "#";
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
 
-
-  // Function to send detections to backend
   const sendDetectionsToBackend = async (objects) => {
     try {
       const response = await fetch("http://localhost:5000/api/detections", {
@@ -40,65 +36,66 @@ function App() {
     } catch (error) {
       console.error("Error sending detection data:", error);
     }
-  };  
+  };
 
-  // Main function
   const runCoco = async () => {
     const net = await cocossd.load();
     console.log("coco-ssd model loaded.");
 
     setInterval(() => {
       detect(net);
-    }, 10);
+    }, 1000);
   };
 
   const detect = async (net) => {
-    // Check data is available
     if (
       typeof webcamRef.current !== "undefined" &&
       webcamRef.current !== null &&
       webcamRef.current.video.readyState === 4
     ) {
-      // Get Video Properties
       const video = webcamRef.current.video;
       const videoWidth = webcamRef.current.video.videoWidth;
       const videoHeight = webcamRef.current.video.videoHeight;
 
-      // Set video width
       webcamRef.current.video.width = videoWidth;
       webcamRef.current.video.height = videoHeight;
 
-      // Set canvas height and width
       canvasRef.current.width = videoWidth;
       canvasRef.current.height = videoHeight;
 
-      // Make Detections
       const objs = await net.detect(video);
-      setDetectedObjects(objs); // Update detected objects state
-      sendDetectionsToBackend(objs); // Send detections to backend
+      setDetectedObjects(objs);
+
+      const aggregated = objs.reduce((acc, obj) => {
+        acc[obj.class] = (acc[obj.class] || 0) + 1;
+        return acc;
+      }, {});
+
+      sendDetectionsToBackend(objs);
 
       const newObjectColors = { ...objectColorsRef.current };
-      objs.forEach(obj => {
+      objs.forEach((obj) => {
         if (!newObjectColors[obj.class]) {
           newObjectColors[obj.class] = getRandomColor();
         }
       });
       objectColorsRef.current = newObjectColors;
 
-      // Draw mesh
       const ctx = canvasRef.current.getContext("2d");
-      drawRect(objs, ctx); 
+      drawRect(objs, ctx);
     }
   };
 
-  useEffect(()=>{runCoco()},[]);
+  useEffect(() => {
+    runCoco();
+  }, []);
 
   return (
     <div className="App">
       <header className="App-header">
         <Webcam
           ref={webcamRef}
-          muted={true} 
+          muted={true}
           style={{
             position: "absolute",
             marginLeft: "auto",
@@ -129,7 +126,7 @@ function App() {
         <div
           style={{
             position: "absolute",
-            bottom: 10, // Position at the bottom of the page
+            bottom: 10,
             marginLeft: "auto",
             marginRight: "auto",
             left: 0,
@@ -146,8 +143,14 @@ function App() {
           <p>Number of objects detected: {detectedObjects.length}</p>
           <ul>
             {detectedObjects.map((obj, index) => (
-              <li key={index}
-              style={{ color: objectColorsRef.current[obj.class] || "white" }}>{obj.class}</li>
+              <li
+                key={index}
+                style={{
+                  color: objectColorsRef.current[obj.class] || "white",
+                }}
+              >
+                {obj.class}
+              </li>
             ))}
           </ul>
         </div>
