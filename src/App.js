@@ -10,6 +10,19 @@ function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [detectedObjects, setDetectedObjects] = useState([]);
+  const objectColorsRef = useRef({});
+
+    // Function to generate random color
+    const getRandomColor = () => {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    };
+
+
   // Function to send detections to backend
   const sendDetectionsToBackend = async (objects) => {
     try {
@@ -33,7 +46,7 @@ function App() {
   const runCoco = async () => {
     const net = await cocossd.load();
     console.log("coco-ssd model loaded.");
-    //  Loop and detect hands
+
     setInterval(() => {
       detect(net);
     }, 10);
@@ -63,6 +76,14 @@ function App() {
       const objs = await net.detect(video);
       setDetectedObjects(objs); // Update detected objects state
       sendDetectionsToBackend(objs); // Send detections to backend
+
+      const newObjectColors = { ...objectColorsRef.current };
+      objs.forEach(obj => {
+        if (!newObjectColors[obj.class]) {
+          newObjectColors[obj.class] = getRandomColor();
+        }
+      });
+      objectColorsRef.current = newObjectColors;
 
       // Draw mesh
       const ctx = canvasRef.current.getContext("2d");
@@ -125,7 +146,8 @@ function App() {
           <p>Number of objects detected: {detectedObjects.length}</p>
           <ul>
             {detectedObjects.map((obj, index) => (
-              <li key={index}>{obj.class}</li>
+              <li key={index}
+              style={{ color: objectColorsRef.current[obj.class] || "white" }}>{obj.class}</li>
             ))}
           </ul>
         </div>
