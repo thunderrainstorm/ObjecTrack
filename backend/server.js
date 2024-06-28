@@ -21,10 +21,10 @@ db.once("open", () => {
   console.log("Connected to MongoDB");
 });
 
-// Schema definition (adjust as per your data structure)
+// Schema definition
 const detectionSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
-  objects: [{ class: String, confidence: Number }],
+  objects: Map,
 });
 
 const Detection = mongoose.model("Detection", detectionSchema);
@@ -38,12 +38,39 @@ app.get("/", (req, res) => {
 app.post("/api/detections", async (req, res) => {
   try {
     const { objects } = req.body;
-    const newDetection = new Detection({ objects });
+
+    // Check if 'objects' is an array
+    if (!Array.isArray(objects)) {
+      throw new Error("Objects must be an array");
+    }
+
+    const timestamp = new Date();
+
+    // Aggregate detections
+    const objectCounts = objects.reduce((acc, obj) => {
+      acc[obj.class] = (acc[obj.class] || 0) + 1;
+      return acc;
+    }, {});
+
+    const newDetection = new Detection({ timestamp, objects: objectCounts });
     await newDetection.save();
+    console.log("Detection saved:", newDetection);
+
     res.status(201).json({ message: "Detection saved successfully" });
   } catch (error) {
     console.error("Error saving detection:", error);
-    res.status(500).json({ message: "Error saving detection" });
+    res.status(400).json({ message: error.message || "Error saving detection" });
+  }
+});
+
+// API endpoint to retrieve detections
+app.get("/api/detections", async (req, res) => {
+  try {
+    const detections = await Detection.find().exec();
+    res.status(200).json(detections);
+  } catch (error) {
+    console.error("Error fetching detections:", error);
+    res.status(500).json({ message: "Error fetching detections" });
   }
 });
 
@@ -56,3 +83,4 @@ app.use((req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
